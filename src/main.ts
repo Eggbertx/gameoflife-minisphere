@@ -1,10 +1,10 @@
-import { Prim, Random, Thread } from 'sphere-runtime'
+import { Prim, Thread } from 'sphere-runtime'
 
 const CELL_SIZE = 8;
 const LINES_COL = Color.Blue.fadeTo(0.5);
 const EMPTY_COL = Color.Black;
 const ALIVE_COL = Color.White;
-const DEAD_COL = new Color(0.4,0.4,0.4); // because Color.DarkGray isn't very dark
+const DEAD_COL = new Color(0.3,0.3,0.3); // because Color.DarkGray isn't very dark
 const font = Font.Default;
 const kb = Keyboard.Default;
 const mouse = Mouse.Default;
@@ -16,13 +16,13 @@ enum CellState {
 };
 
 type NeighborList = {
-	nw:CellState|null, n:CellState|null, ne:CellState|null,
-	w:CellState|null,  e:CellState|null,
-	sw:CellState|null, s:CellState|null, se:CellState|null
+	nw?:CellState, n?:CellState, ne?:CellState,
+	w?:CellState,  e?:CellState,
+	sw?:CellState, s?:CellState, se?:CellState
 };
 
 let timing = 20;
-let cells:CellState[][];
+let cells:Array<Uint8Array>;
 let showGrid = true;
 let gridTex:Surface;
 let gridShape:Shape;
@@ -38,7 +38,7 @@ let cellShape = new Shape(ShapeType.TriStrip, null, new VertexList([
 ]));
 
 let running = true;
-let numSteps = 0;
+let numSteps = 1;
 
 export default class Main extends Thread {
 	constructor() {
@@ -46,6 +46,7 @@ export default class Main extends Thread {
 		Sphere.frameRate = 120;
 		cellPx.fill(255);
 		cellShape.texture = new Texture(CELLS_X, CELLS_Y, cellPx);
+		cellTransform.identity().scale(screen.width/CELL_SIZE, screen.height/CELL_SIZE);
 
 		if(showGrid) {
 			// create grid texture/shape to be drawn onto the board if showGrid == true
@@ -67,7 +68,7 @@ export default class Main extends Thread {
 		// Create 2-dimensional array and fill it with empty cells
 		cells = new Array(CELLS_X);
 		for(let x = 0; x < CELLS_X; x++) {
-			cells[x] = new Array(CELLS_Y);
+			cells[x] = new Uint8Array(CELLS_Y);
 			for(let y = 0; y < CELLS_Y; y++) {
 				cells[x][y] = CellState.Empty;
 			}
@@ -108,21 +109,21 @@ export default class Main extends Thread {
 	randomizeBoard() {
 		// used for (roughly) benchmarking rendering speed
 		this.forEach((x:number, y:number) => {
-			cells[x][y] = Random.discrete(CellState.Empty, CellState.Dead);
+			cells[x][y] = (Math.random() < 0.2)?CellState.Alive:CellState.Empty;
 		});
 	}
 
 	getNeighbors(x:number, y:number):NeighborList {
 		// return object containing CellStates of the given cell's neighbors
 		return {
-			nw: (x > 0 && y > 0)?cells[x-1][y-1]:null,
-			n: (y > 0)?cells[x][y-1]:null,
-			ne: (x < CELLS_X-1 && y > 0)?cells[x+1][y-1]:null,
-			w: (x > 0)?cells[x-1][y]:null,
-			e: (x < CELLS_X-1)?cells[x+1][y]:null,
-			sw: (x > 0 && y < CELLS_Y-1)?cells[x-1][y+1]:null,
-			s: (y < CELLS_Y-1)?cells[x][y+1]:null,
-			se: (x < CELLS_X-1 && y < CELLS_Y-1)?cells[x+1][y+1]:null
+			nw: (x > 0 && y > 0)?cells[x-1][y-1]:undefined,
+			n: (y > 0)?cells[x][y-1]:undefined,
+			ne: (x < CELLS_X-1 && y > 0)?cells[x+1][y-1]:undefined,
+			w: (x > 0)?cells[x-1][y]:undefined,
+			e: (x < CELLS_X-1)?cells[x+1][y]:undefined,
+			sw: (x > 0 && y < CELLS_Y-1)?cells[x-1][y+1]:undefined,
+			s: (y < CELLS_Y-1)?cells[x][y+1]:undefined,
+			se: (x < CELLS_X-1 && y < CELLS_Y-1)?cells[x+1][y+1]:undefined
 		};
 	}
 
@@ -149,12 +150,17 @@ export default class Main extends Thread {
 			let cX = Math.trunc(mouse.x/CELL_SIZE);
 			let cY = Math.trunc(mouse.y/CELL_SIZE);
 			if(cX > -1 && cY > -1 && cX < CELLS_X && cY < CELLS_Y) cells[cX][cY] = CellState.Alive;
+		} else if(mouse.isPressed(MouseKey.Right)) {
+			let cX = Math.trunc(mouse.x/CELL_SIZE);
+			let cY = Math.trunc(mouse.y/CELL_SIZE);
+			if(cX > -1 && cY > -1 && cX < CELLS_X && cY < CELLS_Y) cells[cX][cY] = CellState.Empty;
 		}
 	}
 
 	numLivingNeighbors(x:number, y:number):number {
 		let neighbors = this.getNeighbors(x, y);
 		let livingNeighbors = 0;
+
 		if(neighbors.nw === CellState.Alive) livingNeighbors++;
 		if(neighbors.n === CellState.Alive) livingNeighbors++;
 		if(neighbors.ne === CellState.Alive) livingNeighbors++;
@@ -180,6 +186,7 @@ export default class Main extends Thread {
 					break;
 			}
 		});
+		numSteps++;
 	}
 
 	drawBoard(offsetX = 0, offsetY = 0, cellW = CELL_SIZE, cellH = CELL_SIZE) {
@@ -209,7 +216,6 @@ export default class Main extends Thread {
 			cellPx[offset + 2] = v.b * 255;
 		}
 
-		cellTransform.identity().scale(screen.width/CELL_SIZE, screen.height/CELL_SIZE);
 		if(cellShape.texture != null)
 			cellShape.texture.upload(cellPx);
 		cellShape.draw(Surface.Screen, cellTransform);
@@ -255,9 +261,10 @@ export default class Main extends Thread {
 		this.drawBoard();
 		this.drawInfoBlock(0, 0,
 			"Living cells: " + this.livingCells() +
-			"\nRunning: " + running
+			"\nRunning: " + running +
+			"\n# steps: " + numSteps
 		);
-		if(mouse.isPressed(MouseKey.Right)) {
+		if(mouse.isPressed(MouseKey.Middle)) {
 			let [cX, cY] = this.mouseToCellPos();
 			this.drawInfoBlock(mouse.x, mouse.y,
 				`Cell: (${cX},${cY})` +
