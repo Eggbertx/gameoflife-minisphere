@@ -1,5 +1,5 @@
 # gameoflife-miniSphere
-A (mostly-complete) implementation of Conway's Game of Life in TypeScript using the miniSphere game engine
+A (mostly-complete) implementation of Conway's Game of Life in TypeScript using the miniSphere game engine (RIP John Conway, 1937-2020)
 
 Cell, miniSphere's build engine doesn't have official TypeScript support yet, so I'm including the `cell` and `typescript` directories until it's added in the next release.
 

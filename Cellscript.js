@@ -1,4 +1,4 @@
-import { compile } from "$/cell/ts-tool";
+import { tsc } from "$/cell/ts-tool";
 
 Object.assign(Sphere.Game, {
 	version: 2,
@@ -12,5 +12,5 @@ Object.assign(Sphere.Game, {
 	main: '@/scripts/main.js',
 });
 
-compile('@/scripts',	files('src/*.ts'));
-install('@/',			files('icon.png'));
+install('@/',	files('icon.png'));
+tsc('@/',		'$/tsconfig.json')
